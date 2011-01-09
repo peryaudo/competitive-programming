@@ -1,0 +1,1 @@
+main(x,y){for(gets(&x);scanf("%d%d",&x,&y)+1;)puts(x<y?"NO BRAINS":"MMM BRAINS");}
