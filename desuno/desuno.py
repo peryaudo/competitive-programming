@@ -18,7 +18,7 @@ class website:
 	def __init__(self):
 		return
 	def get_test_data(self, name, cache, testcase_name=''):
-		return ''
+		return ('', '')
 	def get_compile_time_tester(self, name, lang_name):
 		return ''
 
@@ -34,15 +34,28 @@ class language:
 # Judgement site and Compiler dependency classes, should be moved to another .py
 class AOJ(website):
 	def get_test_data(self, name, cache, testcase_name=''):
-		problem_id = re.sub('^aoj([0-9]+)$', r'\1', name)
-		
-		root = lxml.html.fromstring(urllib2.urlopen('http://rose.u-aizu.ac.jp/onlinejudge/ProblemSet/description.jsp?id=' + problem_id).read())
-		sample_input = root.xpath('//h2[.="Sample Input"]/following-sibling::node()/text()')
+		if cache.exist(name + '_in') and cache.exist(name + '_out'):
+			return (cache.get(name + '_in'), cache.get(name + '_out'))
 
+		problem_id = re.sub('^aoj([0-9]+)$', r'\1', name)
+
+		root = lxml.html.fromstring(urllib2.urlopen('http://rose.u-aizu.ac.jp/onlinejudge/ProblemSet/description.jsp?id=' + '%04u' % int(problem_id)).read())
+		sample_input = root.xpath('//h2[.="Sample Input"]/following-sibling::node()/text()')
+		dst_in = ''
 		if len(sample_input) > 0:
-			return sample_input[0].strip()
-		else:
-			return ''
+			dst_in = sample_input[0].strip() + '\n'
+		cache.set(name + '_in', dst_in)
+
+		sample_output = root.xpath('//h2[.="Sample Output"]/following-sibling::node()/text()')
+		if len(sample_output) == 0:
+			sample_output = root.xpath('//h2[.="Output for the Sample Input"]/following-sibling::node()/text()')
+
+		dst_out = ''
+		if len(sample_output) > 0:
+			dst_out = sample_output[0].strip() + '\n'
+		cache.set(name + '_out', dst_out)
+
+		return (dst_in, dst_out)
 
 class JOI(AOJ):
 	LISTS = {'pre5': 500, 'pre6': 510, 'pre7': 521, 'pre8': 532, 'pre9': 543,
@@ -50,12 +63,12 @@ class JOI(AOJ):
 	def get_test_data(self, name, cache, testcase_name=''):
 		problem_id = re.sub('^joi([a-z0-9]+)_([0-9]+)$', r'\1 \2', name).split(' ')
 		if len(problem_id) < 2:
-			return ''
+			return ('', '')
 		if (testcase_name == '' or testcase_name == 'AOJ'):
 			aoj_problem_id = 'aoj%04u' % (int(problem_id[1]) - 1 + self.LISTS[problem_id[0]])
 			return AOJ.get_test_data(self, aoj_problem_id, cache)
 		else:
-			return ''
+			return ('', '')
 
 class gxx(language):
 	LANGUAGE = 'C++'
@@ -75,39 +88,35 @@ class gxx(language):
 			return True
 		return False
 
-	def test(self, tmpdir, testdata=''):
+	def test(self, tmpdir, testdata='', answerdata=''):
 		os.chdir(tmpdir)
 		p = subprocess.Popen('./desuno_tmp', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-		print p.communicate(testdata)[0],
 
-		return
+		return p.communicate(testdata)[0]
 
 # Cache class for test data
 class tester_cache:
-	def open(self, filename):
-		self.filename = os.path.abspath(filename)
-		self.testers = {}
-
-		if os.path.exists(filename):
-			f = open(filename, 'r')
-			self.testers = pickle.load(f)
-			f.close()
+	def __init__(self, cachedir):
+		self.cachedir = os.path.abspath(cachedir)
+		if not os.path.exists(cachedir):
+			os.mkdir(cachedir)
 		return
 
-	def save(self, filename=''):
-		f = open(filename if filename != '' else self.filename, 'w')
-		pickle.dump(self.testers, f)
-		f.close()
-		return
+	def exist(self, key):
+		return os.path.exists(self.cachedir + '/' + key)
 
 	def get(self, key):
-		if key in self.testers:
-			return self.testers[key]
-		else:
-			return ''
+		dst = ''
+		if os.path.exists(self.cachedir + '/' + key):
+			f = open(self.cachedir + '/' + key, 'rb')
+			dst = f.read()
+			f.close()
+		return dst
 
 	def set(self, key, value):
-		self.testers[key] = value
+		f = open(self.cachedir + '/' + key, 'wb')
+		f.write(value)
+		f.close()
 		return
 
 # Main class
@@ -124,8 +133,8 @@ class desuno:
 			sys.stderr.write('could not detect language or contest by its filename.\n')
 			return
 
-		self.cache = tester_cache()
-		self.cache.open(os.path.dirname(os.path.abspath(__file__)) + '/.desuno_cache')
+		#self.cache = tester_cache(os.path.dirname(os.path.abspath(__file__)) + '/.desuno_cache')
+		self.cache = tester_cache(self.tmpdir + '/.desuno_cache')
 
 
 		if self.mode == 'run':
@@ -141,6 +150,7 @@ class desuno:
 	def parse_args(self, argv):
 		op = optparse.OptionParser('%prog [options] <mode> <filename>')
 		op.add_option('-t', '--tester', type='string', dest='tester', help='use particular test data')
+		op.add_option('-r', '--raw_tester', type='string', dest='raw_tester', help='use raw test data')
 
 		(self.options, args) = op.parse_args(argv)
 		if len(args) < 2:
@@ -181,8 +191,21 @@ class desuno:
 		return
 
 	def test(self):
-		self.lang.test(self.tmpdir, self.site.get_test_data(self.name, self.cache))
-
+		testdata, answerdata = self.site.get_test_data(self.name, self.cache)
+		testdata = testdata.replace('\r', '')
+		answerdata = answerdata.replace('\r', '')
+		ret = self.lang.test(self.tmpdir, testdata, answerdata)
+		ret = ret.replace('\r', '')
+		print ret
+		if answerdata != '':
+			if ret == answerdata:
+				print '[The answer is correct]'
+			else:
+				if ret.strip() == answerdata.strip():
+					print '[The answer is wrong, but it is an presentation error]'
+				else:
+					print '[The answer is wrong. expected answer is ]'
+					print answerdata
 		return
 
 if  __name__ == '__main__':
