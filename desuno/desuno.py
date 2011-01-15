@@ -5,18 +5,21 @@
 import sys
 import os
 import os.path
-from optparse import OptionParser
+import optparse
 import pickle
 import re
+import urllib2
+import lxml.html
+import subprocess
 
 # Abstract Classes
 class website:
 	REQUIRE_COMPILE_TIME_TESTER = False
 	def __init__(self):
 		return
-	def get_test_data(self, cache, option=''):
+	def get_test_data(self, name, cache, testcase_name=''):
 		return ''
-	def get_compile_time_tester(self, lang_name):
+	def get_compile_time_tester(self, name, lang_name):
 		return ''
 
 class language:
@@ -30,9 +33,29 @@ class language:
 
 # Judgement site and Compiler dependency classes, should be moved to another .py
 class AOJ(website):
-	def get_test_data(self, cache, option=''):
-		#!FIXME! write tester obtainer
-		return ''
+	def get_test_data(self, name, cache, testcase_name=''):
+		problem_id = re.sub('^aoj([0-9]+)$', r'\1', name)
+		
+		root = lxml.html.fromstring(urllib2.urlopen('http://rose.u-aizu.ac.jp/onlinejudge/ProblemSet/description.jsp?id=' + problem_id).read())
+		sample_input = root.xpath('//h2[.="Sample Input"]/following-sibling::node()/text()')
+
+		if len(sample_input) > 0:
+			return sample_input[0].strip()
+		else:
+			return ''
+
+class JOI(AOJ):
+	LISTS = {'pre5': 500, 'pre6': 510, 'pre7': 521, 'pre8': 532, 'pre9': 543,
+			'final5': 505, 'final6': 516, 'final7': 527, 'final8': 538}
+	def get_test_data(self, name, cache, testcase_name=''):
+		problem_id = re.sub('^joi([a-z0-9]+)_([0-9]+)$', r'\1 \2', name).split(' ')
+		if len(problem_id) < 2:
+			return ''
+		if (testcase_name == '' or testcase_name == 'AOJ'):
+			aoj_problem_id = 'aoj%04u' % (int(problem_id[1]) - 1 + self.LISTS[problem_id[0]])
+			return AOJ.get_test_data(self, aoj_problem_id, cache)
+		else:
+			return ''
 
 class gxx(language):
 	LANGUAGE = 'C++'
@@ -54,7 +77,9 @@ class gxx(language):
 
 	def test(self, tmpdir, testdata=''):
 		os.chdir(tmpdir)
-		#!FIXME! write tester using stdin
+		p = subprocess.Popen('./desuno_tmp', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		print p.communicate(testdata)[0],
+
 		return
 
 # Cache class for test data
@@ -88,7 +113,7 @@ class tester_cache:
 # Main class
 class desuno:
 	FILETYPES = {'.cpp': gxx()}
-	WEBSITES = [('aoj[0-9]+', AOJ())]
+	WEBSITES = [('aoj[0-9]+', AOJ()), ('joi[a-z0-9_]+', JOI())]
 	tmpdir = '/tmp'
 	def __init__(self, argv):
 		if self.parse_args(argv):
@@ -114,7 +139,7 @@ class desuno:
 			return
 
 	def parse_args(self, argv):
-		op = OptionParser('%prog [options] <mode> <filename>')
+		op = optparse.OptionParser('%prog [options] <mode> <filename>')
 		op.add_option('-t', '--tester', type='string', dest='tester', help='use particular test data')
 
 		(self.options, args) = op.parse_args(argv)
@@ -125,8 +150,7 @@ class desuno:
 		return False
 
 	def parse_file_type(self, filename):
-		(root, ext) = os.path.splitext(self.filename)
-		tail = os.path.basename(self.filename)
+		(self.name, ext) = os.path.splitext(os.path.basename(self.filename))
 		if ext in self.FILETYPES:
 			self.lang = self.FILETYPES[ext]
 		else:
@@ -134,7 +158,7 @@ class desuno:
 
 		no_match = True
 		for pattern, site in self.WEBSITES:
-			if re.match(pattern, tail):
+			if re.match(pattern, self.name):
 				self.site = site
 				no_match = False
 
@@ -151,13 +175,13 @@ class desuno:
 	def compile(self):
 		tester = ''
 		if self.site.REQUIRE_COMPILE_TIME_TESTER:
-			tester = self.site.get_compile_time_tester(self.lang.LANGUAGE)
+			tester = self.site.get_compile_time_tester(self.name, self.lang.LANGUAGE)
 
 		self.lang.compile(self.filename, self.tmpdir, tester)
 		return
 
 	def test(self):
-		self.lang.test(self.tmpdir)
+		self.lang.test(self.tmpdir, self.site.get_test_data(self.name, self.cache))
 
 		return
 
