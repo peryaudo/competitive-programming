@@ -3,9 +3,6 @@
 #include <algorithm>
 #include <climits>
 using namespace std;
-/*inline long long abs(long long x){
-	return x < 0 ? -x : x;
-}*/
 
 int main()
 {

@@ -179,12 +179,13 @@ class desuno:
 
 	def run(self):
 		if self.compile():
-			sys.stderr.write('[compile returns not 0. exit.]\n')
+			sys.stderr.write('[compiler returns true. exit.]\n')
 			return
 		self.test()
 		return
 
 	def compile(self):
+		print '[compiling...]'
 		tester = ''
 		if self.site.REQUIRE_COMPILE_TIME_TESTER:
 			tester = self.site.get_compile_time_tester(self.name, self.lang.LANGUAGE)
@@ -194,9 +195,12 @@ class desuno:
 		return False
 
 	def test(self):
+		print '[testing...]'
+		print '[loading or downloading tester data...]'
 		testdata, answerdata = self.site.get_test_data(self.name, self.cache)
 		testdata = testdata.replace('\r', '')
 		answerdata = answerdata.replace('\r', '')
+		print '[tester running...]'
 		ret = self.lang.test(self.tmpdir, testdata, answerdata)
 		ret = ret.replace('\r', '')
 		print ret

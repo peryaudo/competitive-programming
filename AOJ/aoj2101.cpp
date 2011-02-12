@@ -1,16 +1,18 @@
 #include <cstdio>
+#include <cmath>
 
 using namespace std;
 inline void judge(int x){
-	int N;
-	N = x;
-	for(int i = 1, l = (x / 2) + 1; i < l; i++){
-		if(x % i) continue;
-		N -= i;
+	int N = x, S = 0;
+	if(N != 1) S = 1;
+	for(int i = 2, l = sqrt(N); i <= l; i++){
+		if(N % i) continue;
+		S += i;
+		if(N / i != i) S += N / i;
 	}
-	if(N == 0) puts("perfect number");
-	if(N > 0) puts("deficient number");
-	if(N < 0) puts("abundant number");
+	if(N == S) puts("perfect number");
+	if(N > S) puts("deficient number");
+	if(N < S) puts("abundant number");
 }
 int main(){
 	while(1){
