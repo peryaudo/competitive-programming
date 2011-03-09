@@ -1,9 +1,10 @@
-// Challenge Succeeded
+// System Test Passed
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <map>
+#include <cmath>
 using namespace std;
 
 class ColorfulRabbits {
@@ -17,7 +18,7 @@ public:
 		int res = 0;
 		for(map<int, int>::iterator it = ma.begin(); it != ma.end(); it++){
 			int a = (*it).first, b = (*it).second;
-			res += (a + 1) * ((b + 3) / 3);
+			res += (a + 1) * (int)ceil((double)b / (a + 1));
 		}
 		return res;
 	}
