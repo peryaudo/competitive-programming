@@ -1,4 +1,4 @@
-// Challenge Succeeded
+// System Test Passed
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -16,28 +16,28 @@ public:
 		sort(v.begin(), v.end(), greater<pair<int, string> >());
 
 		int total = 0;
+		int f = 0;
 		while(!v.empty()){
+			int fd = 0;
 			vector<pair<int, string> >::iterator beg = v.begin();
 			string t = (*beg).second;
 			reverse(t.begin(), t.end());
-			for(vector<pair<int, string> >::iterator it = v.begin(); it != v.end(); it++){
+			for(vector<pair<int, string> >::iterator it = v.begin() + 1; it != v.end(); it++){
 				if((*it).second == t){
 					total += (*beg).first + (*it).first;
 					v.erase(it);
+					fd = 1;
 					break;
+				}
+			}
+			if(!fd && !f){
+				if(t == (*beg).second){
+					total += (*beg).first;
+					f = 1;
 				}
 			}
 			v.erase(beg);
 		}
 		return total;
-		
 	}
-
-	
-
 };
-
-
-// Powered by FileEdit
-// Powered by TZTester 1.01 [25-Feb-2003]
-// Powered by CodeProcessor
